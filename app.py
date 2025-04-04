@@ -71,9 +71,12 @@ def load_data():
     indicators = {
         "NY.GDP.MKTP.CD": "GDP (current US$)",
         "FP.CPI.TOTL.ZG": "Inflation (CPI %)",
-        "SL.UEM.TOTL.ZS": "Unemployment (%)"
+        "SL.UEM.TOTL.ZS": "Unemployment (%)",
+        "NE.EXP.GNFS.ZS": "Exports (% of GDP)"
     }
-    df = wbdata.get_dataframe(indicators, convert_date=True)
+    all_countries = wbdata.get_country()
+    country_codes = [c['id'] for c in all_countries]
+    df = wbdata.get_dataframe(indicators, country=country_codes, convert_date=True, data_date=(datetime(2000, 1, 1), datetime.today()))
     df.reset_index(inplace=True)
     df = df.rename(columns={"country": "Country", "date": "Year"})
     df["Year"] = pd.to_datetime(df["Year"]).dt.year
