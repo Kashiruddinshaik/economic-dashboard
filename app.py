@@ -3,25 +3,41 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from prophet import Prophet
 from datetime import datetime
-from openai import OpenAI
+import openai
 
-# Streamlit setup
-st.set_page_config(page_title="Economic Dashboard", layout="wide")
+st.set_page_config(page_title="Economic Dashboard", layout="centered")
 
-# Styling
+# Custom styling for a clean card-style layout
 st.markdown("""
     <style>
-        .main { background-color: #0e1117; color: white; }
+        .main { background-color: #f7f7f7; }
         .stApp { font-family: 'Segoe UI', sans-serif; }
-        .block-container { padding: 2rem 2rem; }
-        .title-text { font-size: 2.2rem; font-weight: bold; margin-bottom: 0.5rem; }
-        .footer { font-size: 0.8rem; margin-top: 3rem; text-align: center; color: gray; }
-        .metric-box { background-color: #1e1e1e; border-radius: 12px; padding: 1rem; text-align: center; margin-bottom: 1rem; }
-        .insight-box { background-color: #262730; border-left: 6px solid #4CAF50; border-radius: 8px; padding: 1rem; margin-top: 1rem; font-size: 1rem; }
+        .title-text { font-size: 2rem; font-weight: 600; margin-bottom: 1rem; color: #2c3e50; }
+        .metric-box {
+            background-color: #ffffff;
+            border-radius: 10px;
+            padding: 1rem;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+            text-align: center;
+        }
+        .insight-box {
+            background-color: #f1f1f1;
+            border-left: 5px solid #4CAF50;
+            padding: 1rem;
+            margin-top: 1rem;
+            font-size: 1rem;
+            border-radius: 5px;
+        }
+        .footer {
+            font-size: 0.9rem;
+            margin-top: 3rem;
+            text-align: center;
+            color: #888;
+        }
     </style>
 """, unsafe_allow_html=True)
 
-# Load dataset
+# Load and clean dataset
 try:
     df = pd.read_csv("data/clean_economic_data.csv")
     df = df[df["Country"].notnull()]
@@ -31,62 +47,58 @@ except Exception as e:
     st.error(f"Error loading data: {e}")
     st.stop()
 
-# Sidebar
-st.sidebar.title("Economic Dashboard")
-st.sidebar.markdown("Analyze key economic indicators by country from 2000 onwards.")
+# Sidebar controls
+st.sidebar.title("🌍 Economic Dashboard")
+st.sidebar.write("Analyze economic indicators from World Bank data")
 countries = sorted(df["Country"].dropna().unique())
 indicators = df.columns[2:]
 selected_indicator = st.sidebar.selectbox("Select an indicator", indicators)
 selected_country = st.sidebar.selectbox("Select a country", countries)
 
-# Layout
-col1, col2 = st.columns([2, 1])
+# Filtered data
 filtered = df[df["Country"] == selected_country][["Year", selected_indicator]].dropna()
 
-# Line chart
-with col1:
-    st.markdown(f"<div class='title-text'>{selected_country} – {selected_indicator} Over Time</div>", unsafe_allow_html=True)
-    st.line_chart(filtered.set_index("Year"))
+# Main layout
+st.markdown(f"<div class='title-text'>{selected_country} – {selected_indicator} Over Time</div>", unsafe_allow_html=True)
+st.line_chart(filtered.set_index("Year"))
 
-# Metric + AI Summary
-with col2:
-    latest_year = filtered["Year"].max()
-    latest_value = filtered[filtered["Year"] == latest_year][selected_indicator].values[0]
-    st.markdown(f"### Latest Value ({latest_year})")
-    st.markdown(f"<div class='metric-box'><h2>{latest_value:,.2f}</h2></div>", unsafe_allow_html=True)
+latest_year = filtered["Year"].max()
+latest_value = filtered[filtered["Year"] == latest_year][selected_indicator].values[0]
+st.markdown(f"<div class='metric-box'><h3>Latest Value ({latest_year})</h3><h2>{latest_value:,.2f}</h2></div>", unsafe_allow_html=True)
 
-    first_year = filtered["Year"].min()
-    first_value = filtered[filtered["Year"] == first_year][selected_indicator].values[0]
-    growth = ((latest_value - first_value) / first_value) * 100
-    insight = f"Between {first_year} and {latest_year}, <b>{selected_country}</b>'s <b>{selected_indicator}</b> changed by <b>{growth:.2f}%</b>."
-    st.markdown(f"<div class='insight-box'>{insight}</div>", unsafe_allow_html=True)
+first_year = filtered["Year"].min()
+first_value = filtered[filtered["Year"] == first_year][selected_indicator].values[0]
+growth = ((latest_value - first_value) / first_value) * 100
+insight = f"Between {first_year} and {latest_year}, <b>{selected_country}</b>'s <b>{selected_indicator}</b> changed by <b>{growth:.2f}%</b>."
+st.markdown(f"<div class='insight-box'>{insight}</div>", unsafe_allow_html=True)
 
-    # AI Summary
-    if st.button("Generate AI Insight Summary"):
-        try:
-            client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-            prompt = f"Summarize the trend of {selected_indicator} for {selected_country} from {first_year} to {latest_year}. Data: {filtered.to_dict(orient='records')}"
-            response = client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.5,
-                max_tokens=150
-            )
-            summary = response.choices[0].message.content
-            st.markdown(f"<div class='insight-box'>{summary}</div>", unsafe_allow_html=True)
-        except Exception as e:
-            st.error(f"Error generating summary: {e}")
+# AI insight button
+if st.button("Generate AI Insight Summary"):
+    try:
+        openai.api_key = st.secrets["OPENAI_API_KEY"]
+        prompt = f"Summarize the trend of {selected_indicator} for {selected_country} from {first_year} to {latest_year}. Data: {filtered.to_dict(orient='records')}"
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.5,
+            max_tokens=150
+        )
+        summary = response['choices'][0]['message']['content']
+        st.markdown(f"<div class='insight-box'>{summary}</div>", unsafe_allow_html=True)
+    except Exception as e:
+        st.error(f"Error generating summary: {e}")
 
-# View Raw Data
-with st.expander("View Raw Data"):
+# Raw data display and download
+with st.expander("🔎 View Raw Data"):
     st.dataframe(filtered)
     csv = filtered.to_csv(index=False).encode("utf-8")
-    st.download_button("Download Filtered CSV", csv, file_name=f"{selected_country}_{selected_indicator}.csv")
+    st.download_button("📥 Download Filtered CSV", csv, file_name=f"{selected_country}_{selected_indicator}.csv")
 
-# GDP Forecast using Prophet
+# Forecasting for GDP
 if selected_indicator == "GDP (current US$)":
     st.markdown("---")
-    st.subheader(f"GDP Forecast for {selected_country} (Next 4 Years)")
+    st.subheader(f"📈 GDP Forecast for {selected_country} (Next 4 Years)")
+
     gdp_df = df[df["Country"] == selected_country][["Year", "GDP (current US$)"]].dropna()
     gdp_df = gdp_df.rename(columns={"Year": "ds", "GDP (current US$)": "y"})
     gdp_df["ds"] = pd.to_datetime(gdp_df["ds"], format="%Y")
@@ -96,8 +108,7 @@ if selected_indicator == "GDP (current US$)":
     future = model.make_future_dataframe(periods=4, freq="Y")
     forecast = model.predict(future)
 
-    fig1 = model.plot(forecast)
-    st.pyplot(fig1)
+    st.pyplot(model.plot(forecast))
 
     forecast_df = forecast[["ds", "yhat", "yhat_lower", "yhat_upper"]].tail(4)
     forecast_df = forecast_df.rename(columns={
@@ -107,16 +118,14 @@ if selected_indicator == "GDP (current US$)":
         "yhat_upper": "Upper Bound"
     })
     forecast_df["Year"] = forecast_df["Year"].dt.year
-
     st.dataframe(forecast_df)
     forecast_csv = forecast_df.to_csv(index=False).encode("utf-8")
-    st.download_button("Download Forecast CSV", forecast_csv, file_name=f"{selected_country}_GDP_forecast.csv")
+    st.download_button("📥 Download Forecast CSV", forecast_csv, file_name=f"{selected_country}_GDP_forecast.csv")
 
-# Country comparison
+# Country comparison section
 st.markdown("---")
-st.subheader(f"Compare {selected_indicator} Across Countries")
+st.subheader(f"🌐 Compare {selected_indicator} Across Countries")
 multi_countries = st.multiselect("Select countries to compare", countries)
-
 if multi_countries:
     compare_df = df[df["Country"].isin(multi_countries)][["Country", "Year", selected_indicator]].dropna()
     pivot_df = compare_df.pivot(index="Year", columns="Country", values=selected_indicator)
