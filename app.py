@@ -20,8 +20,8 @@ def load_data():
         "SL.UEM.TOTL.ZS": "Unemployment (%)",
         "NE.EXP.GNFS.ZS": "Exports (% of GDP)"
     }
-    # Fix: access country codes using attributes, not dict-style
-    country_codes = [country.id for country in wbdata.get_country()]
+    # Fix: access country codes using dictionary key 'id'
+    country_codes = [country['id'] for country in wbdata.get_country()]
 
     df = wbdata.get_dataframe(
         indicators,
