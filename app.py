@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 import openai
 import pycountry
+import wbdata
+import io
 
 st.set_page_config(page_title="Economic Dashboard", layout="wide")
 
@@ -53,7 +55,7 @@ st.markdown("""
 st.markdown("""
     <div class="title-section">
         <h1>Global Economic Dashboard</h1>
-        <p>Visualize and analyze key economic indicators across countries</p>
+        <p>Live data from World Bank across countries and years</p>
     </div>
 """, unsafe_allow_html=True)
 
@@ -64,15 +66,23 @@ def get_flag(country_name):
     except:
         return ""
 
+@st.cache_data(ttl=86400)
 def load_data():
-    df = pd.read_csv("data/clean_economic_data.csv")
-    df = df[df["Country"].notnull()]
-    df["Year"] = df["Year"].astype(str).str.replace(",", "").astype(int)
-    return df[df["Year"] >= 2000]
+    indicators = {
+        "NY.GDP.MKTP.CD": "GDP (current US$)",
+        "FP.CPI.TOTL.ZG": "Inflation (CPI %)",
+        "SL.UEM.TOTL.ZS": "Unemployment (%)"
+    }
+    df = wbdata.get_dataframe(indicators, convert_date=True)
+    df.reset_index(inplace=True)
+    df = df.rename(columns={"country": "Country", "date": "Year"})
+    df["Year"] = pd.to_datetime(df["Year"]).dt.year
+    df = df[df["Year"] >= 2000]
+    return df
 
 df = load_data()
 countries = sorted(df["Country"].dropna().unique().tolist())
-indicators = df.columns[2:]
+indicators = df.columns.drop(["Country", "Year"])
 
 st.sidebar.title("Navigation")
 st.sidebar.caption("Choose country and indicator")
@@ -84,7 +94,7 @@ first_year = filtered["Year"].min()
 latest_year = filtered["Year"].max()
 first_value = filtered[filtered["Year"] == first_year][selected_indicator].values[0]
 latest_value = filtered[filtered["Year"] == latest_year][selected_indicator].values[0]
-growth = ((latest_value - first_value) / first_value) * 100
+growth = ((latest_value - first_value) / first_value) * 100 if first_value != 0 else 0
 
 flag = get_flag(selected_country)
 header_title = f"{flag} {selected_country} — {selected_indicator}"
