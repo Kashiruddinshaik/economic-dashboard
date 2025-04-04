@@ -25,6 +25,7 @@ You can select a country, view key indicators over time, see smart insights, and
         └── clean_economic_data.csv
 
 🌐 Live App: https://economic-dashboard-62z6pkc2zab9dz6mqcuzjr.streamlit.app
+
 📊 Data Source: https://data.worldbank.org
 
 ## Tech Stack
