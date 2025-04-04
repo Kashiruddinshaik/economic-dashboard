@@ -1,132 +1,149 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-import wbdata
+from prophet import Prophet
 from datetime import datetime
 import openai
-import os
 
 st.set_page_config(page_title="Economic Dashboard", layout="wide")
 
-# Load OpenAI API Key
+# Load OpenAI API key
 openai.api_key = st.secrets["OPENAI_API_KEY"]
 
-# Fetch data from World Bank
-@st.cache_data(ttl=86400)
+# Custom CSS styling
+st.markdown("""
+    <style>
+        .main { background-color: #f7f7f7; }
+        .stApp { font-family: 'Segoe UI', sans-serif; }
+        .metric-card {
+            background-color: #1c1c1c;
+            padding: 1rem;
+            border-radius: 10px;
+            text-align: center;
+            color: white;
+        }
+        .summary-box {
+            background-color: #222;
+            padding: 1rem;
+            border-radius: 8px;
+            border-left: 6px solid #4CAF50;
+            font-size: 1rem;
+            color: white;
+        }
+        .footer {
+            font-size: 0.9rem;
+            margin-top: 3rem;
+            text-align: center;
+            color: #888;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+# Load and preprocess data
 def load_data():
-    indicators = {
-        "NY.GDP.MKTP.CD": "GDP (current US$)",
-        "FP.CPI.TOTL.ZG": "Inflation (CPI %)",
-        "SL.UEM.TOTL.ZS": "Unemployment (%)",
-        "NE.EXP.GNFS.ZS": "Exports (% of GDP)"
-    }
-    try:
-        # Get country ISO codes
-        countries = wbdata.get_country()
-        if not countries:
-            st.warning("No countries retrieved from wbdata.get_country(). Using fallback country codes.")
-            # Fallback list of country codes
-            country_codes = ['US', 'CN', 'IN', 'GB', 'FR', 'DE', 'JP', 'BR', 'AU', 'CA']
-        else:
-            # Debug: Print a sample of the data to inspect
-            st.write("Sample countries:", countries[:5])
-            # Extract ISO2 codes
-            country_codes = []
-            for country in countries:
-                if 'iso2Code' in country:
-                    country_codes.append(country['iso2Code'])
-                else:
-                    st.write(f"Missing 'iso2Code' in country: {country}")
-            if not country_codes:
-                st.warning("No valid country codes found. Using fallback country codes.")
-                country_codes = ['US', 'CN', 'IN', 'GB', 'FR', 'DE', 'JP', 'BR', 'AU', 'CA']
+    df = pd.read_csv("data/clean_economic_data.csv")
+    df = df[df["Country"].notnull()]
+    df["Year"] = df["Year"].astype(str).str.replace(",", "").astype(int)
+    return df[df["Year"] >= 2000]
 
-        # Fetch data
-        df = wbdata.get_dataframe(
-            indicators,
-            country=country_codes,
-            data_date=(datetime(2000, 1, 1), datetime.today()),
-            convert_date=True
-        )
-        if df.empty:
-            raise ValueError("No data retrieved from wbdata.get_dataframe()")
-        
-        df.reset_index(inplace=True)
-        df.rename(columns={"country": "Country", "date": "Year"}, inplace=True)
-        df["Year"] = pd.to_datetime(df["Year"]).dt.year
-        df = df[df["Year"] >= 2000]
-        return df
-    except Exception as e:
-        st.error(f"Error loading data: {str(e)}")
-        return pd.DataFrame()  # Return empty dataframe to prevent app crash
-
-# Generate AI-based insight using OpenAI
-@st.cache_data(show_spinner=False)
-def generate_ai_insight(text):
-    try:
-        prompt = f"Generate a summary for this economic indicator trend:\n{text}"
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": prompt}]
-        )
-        return response['choices'][0]['message']['content']
-    except Exception as e:
-        return f"Error generating insight: {str(e)}"
-
-# Load data
 df = load_data()
-
-# Check if data loaded successfully
-if df.empty:
-    st.error("Failed to load data. Please check the logs or try again later.")
-    st.stop()
+countries = sorted(df["Country"].unique())
+indicators = df.columns[2:]
 
 # Sidebar
-st.sidebar.markdown("## 🌍 Economic Dashboard")
-st.sidebar.markdown("Analyze key economic indicators by country from 2000 onwards.")
-
-indicators = df.columns[2:]
+st.sidebar.title("🌐 Economic Dashboard")
+st.sidebar.caption("Analyze key economic indicators by country from 2000 onwards.")
 selected_indicator = st.sidebar.selectbox("Select an indicator", indicators)
-selected_country = st.sidebar.selectbox("Select a country", sorted(df["Country"].unique()))
+selected_country = st.sidebar.selectbox("Select a country", countries)
 
 # Filter data
-country_df = df[df["Country"] == selected_country][["Year", selected_indicator]].dropna()
+filtered = df[df["Country"] == selected_country][["Year", selected_indicator]].dropna()
+first_year = filtered["Year"].min()
+latest_year = filtered["Year"].max()
+first_value = filtered[filtered["Year"] == first_year][selected_indicator].values[0]
+latest_value = filtered[filtered["Year"] == latest_year][selected_indicator].values[0]
+growth = ((latest_value - first_value) / first_value) * 100
 
-# Main Panel
-if country_df.empty:
-    st.warning(f"No data available for {selected_country} and {selected_indicator}.")
-else:
-    st.markdown(f"### {selected_country} - {selected_indicator} Over Time")
-    st.line_chart(data=country_df, x="Year", y=selected_indicator)
+# Tabs
+overview_tab, ai_tab, forecast_tab, compare_tab = st.tabs(["📈 Overview", "🤖 AI Insight", "🔮 Forecast", "🌍 Country Comparison"])
 
-    latest_year = country_df["Year"].max()
-    latest_value = country_df[country_df["Year"] == latest_year][selected_indicator].values[0]
-    initial_year = country_df["Year"].min()
-    initial_value = country_df[country_df["Year"] == initial_year][selected_indicator].values[0]
-    if initial_value == 0:
-        percentage_change = 0
+# Overview Tab
+with overview_tab:
+    st.markdown(f"## {selected_country} – {selected_indicator} Over Time")
+    st.line_chart(filtered.set_index("Year"))
+    st.markdown(f"<div class='metric-card'><h4>Latest Value ({latest_year})</h4><h2>{latest_value:,.2f}</h2></div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='summary-box'>Between {first_year} and {latest_year}, <b>{selected_country}'s {selected_indicator}</b> changed by <b>{growth:.2f}%</b>.</div>", unsafe_allow_html=True)
+    with st.expander("🔍 View Raw Data"):
+        st.dataframe(filtered)
+        csv = filtered.to_csv(index=False).encode("utf-8")
+        st.download_button("📥 Download Filtered CSV", csv, file_name=f"{selected_country}_{selected_indicator}.csv")
+
+# AI Insight Tab
+with ai_tab:
+    st.markdown("## 🧠 AI-generated Insight")
+    if st.button("Generate AI Insight Summary"):
+        try:
+            prompt = f"Summarize the trend of {selected_indicator} for {selected_country} from {first_year} to {latest_year}. Data: {filtered.to_dict(orient='records')}"
+            response = openai.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.5,
+                max_tokens=150
+            )
+            summary = response.choices[0].message.content
+            st.markdown(f"<div class='summary-box'>{summary}</div>", unsafe_allow_html=True)
+        except Exception as e:
+            st.error(f"Error generating summary: {e}")
+
+# Forecast Tab
+with forecast_tab:
+    if selected_indicator == "GDP (current US$)":
+        st.markdown(f"## 📈 GDP Forecast for {selected_country} (Next 4 Years)")
+        gdp_df = df[df["Country"] == selected_country][["Year", "GDP (current US$)"]].dropna()
+        gdp_df = gdp_df.rename(columns={"Year": "ds", "GDP (current US$)": "y"})
+        gdp_df["ds"] = pd.to_datetime(gdp_df["ds"], format="%Y")
+
+        model = Prophet()
+        model.fit(gdp_df)
+        future = model.make_future_dataframe(periods=4, freq="Y")
+        forecast = model.predict(future)
+
+        fig = model.plot(forecast)
+        fig.patch.set_facecolor('#0e1117')
+        ax = fig.gca()
+        ax.set_title(f"{selected_country} GDP Forecast", fontsize=14)
+        ax.set_ylabel("GDP (US$)")
+        ax.set_xlabel("Year")
+        st.pyplot(fig)
+
+        forecast_df = forecast[["ds", "yhat", "yhat_lower", "yhat_upper"]].tail(4)
+        forecast_df = forecast_df.rename(columns={
+            "ds": "Year",
+            "yhat": "Predicted GDP",
+            "yhat_lower": "Lower Bound",
+            "yhat_upper": "Upper Bound"
+        })
+        forecast_df["Year"] = forecast_df["Year"].dt.year
+        st.dataframe(forecast_df)
+        forecast_csv = forecast_df.to_csv(index=False).encode("utf-8")
+        st.download_button("📥 Download Forecast CSV", forecast_csv, file_name=f"{selected_country}_GDP_forecast.csv")
     else:
-        percentage_change = ((latest_value - initial_value) / initial_value) * 100
+        st.info("GDP Forecasting is only available when 'GDP (current US$)' is selected.")
 
-    st.metric(
-        label=f"Latest Value ({latest_year})",
-        value=f"{latest_value:,.2f}",
-        delta=f"{percentage_change:.2f}% change since {initial_year}"
-    )
-
-# AI Summary
-if st.button("Generate AI Insight Summary"):
-    insight = generate_ai_insight(country_df.to_csv(index=False))
-    st.success(insight)
-
-# Raw Data
-with st.expander("📊 View Raw Data"):
-    st.dataframe(country_df)
-    st.download_button("Download Filtered CSV", data=country_df.to_csv(index=False), file_name=f"{selected_country}_{selected_indicator}.csv")
+# Country Comparison
+with compare_tab:
+    st.markdown("## 🌍 Country Comparison")
+    multi_countries = st.multiselect("Select countries to compare", countries)
+    if multi_countries:
+        compare_df = df[df["Country"].isin(multi_countries)][["Country", "Year", selected_indicator]].dropna()
+        pivot_df = compare_df.pivot(index="Year", columns="Country", values=selected_indicator)
+        st.line_chart(pivot_df)
+        st.dataframe(pivot_df)
 
 # Footer
-st.markdown("""
----
-Built by [Kashiruddin Shaik](https://github.com/Kashiruddinshaik) — Powered by Streamlit & World Bank  
-Last updated: Apr 04, 2025
-""")
+st.markdown(f"""
+    <div class='footer'>
+        Built by <a href='https://github.com/kashiruddinshaik' target='_blank'>Kashiruddin Shaik</a> — Powered by Streamlit & World Bank<br>
+        Last updated: {datetime.today().strftime('%b %d, %Y')}
+    </div>
+""", unsafe_allow_html=True)
