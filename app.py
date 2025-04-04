@@ -3,10 +3,11 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from prophet import Prophet
 from datetime import datetime
-import base64
 
-st.set_page_config(page_title="🌍 Economic Dashboard", layout="wide")
+# App configuration
+st.set_page_config(page_title="Economic Dashboard", layout="wide")
 
+# Custom CSS styles
 st.markdown("""
     <style>
         .main { background-color: #0e1117; color: white; }
@@ -19,77 +20,97 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# Load and clean data
 try:
     df = pd.read_csv("data/clean_economic_data.csv")
     df = df[df["Country"].notnull()]
     df["Year"] = df["Year"].astype(str).str.replace(",", "").astype(int)
     df = df[df["Year"] >= 2000]
 except Exception as e:
-    st.error(f"❌ Error loading data: {e}")
+    st.error(f"Error loading data: {e}")
     st.stop()
 
-st.sidebar.title("📊 Economic Dashboard")
+# Sidebar controls
+st.sidebar.title("Economic Dashboard")
 st.sidebar.markdown("Analyze key economic indicators by country from 2000 onwards.")
 
 countries = sorted(df["Country"].unique())
-selected_country = st.sidebar.selectbox("🌐 Select a country", countries)
 indicators = df.columns[2:]
-selected_indicator = st.sidebar.selectbox("📈 Select an indicator", indicators)
+selected_indicator = st.sidebar.selectbox("Select an indicator", indicators)
 
-col1, col2 = st.columns([2, 1])
+# Tab layout
+tabs = st.tabs(["Single Country View", "Compare Countries"])
 
-with col1:
-    st.markdown(f"<div class='title-text'>{selected_country} – {selected_indicator} Over Time</div>", unsafe_allow_html=True)
-    filtered = df[df["Country"] == selected_country][["Year", selected_indicator]].dropna()
-    st.line_chart(filtered.set_index("Year"))
+# Single Country Tab
+with tabs[0]:
+    selected_country = st.sidebar.selectbox("Select a country", countries)
+    col1, col2 = st.columns([2, 1])
 
-with col2:
-    latest_year = filtered["Year"].max()
-    latest_value = filtered[filtered["Year"] == latest_year][selected_indicator].values[0]
-    st.markdown(f"### 📌 Latest Value ({latest_year})")
-    st.markdown(f"<div class='metric-box'><h2>{latest_value:,.2f}</h2></div>", unsafe_allow_html=True)
+    with col1:
+        st.markdown(f"<div class='title-text'>{selected_country} – {selected_indicator} Over Time</div>", unsafe_allow_html=True)
+        filtered = df[df["Country"] == selected_country][["Year", selected_indicator]].dropna()
+        st.line_chart(filtered.set_index("Year"))
 
-    first_year = filtered["Year"].min()
-    first_value = filtered[filtered["Year"] == first_year][selected_indicator].values[0]
-    growth = ((latest_value - first_value) / first_value) * 100
-    insight_text = f"Between {first_year} and {latest_year}, <b>{selected_country}</b>'s <b>{selected_indicator}</b> changed by <b>{growth:.2f}%</b>."
-    st.markdown(f"<div class='insight-box'>{insight_text}</div>", unsafe_allow_html=True)
+    with col2:
+        latest_year = filtered["Year"].max()
+        latest_value = filtered[filtered["Year"] == latest_year][selected_indicator].values[0]
+        st.markdown(f"### Latest Value ({latest_year})")
+        st.markdown(f"<div class='metric-box'><h2>{latest_value:,.2f}</h2></div>", unsafe_allow_html=True)
 
-with st.expander("📄 View Raw Data"):
-    st.dataframe(filtered)
-    csv = filtered.to_csv(index=False).encode('utf-8')
-    st.download_button("⬇️ Download Filtered CSV", csv, file_name=f"{selected_country}_{selected_indicator}.csv")
+        first_year = filtered["Year"].min()
+        first_value = filtered[filtered["Year"] == first_year][selected_indicator].values[0]
+        growth = ((latest_value - first_value) / first_value) * 100
+        insight = f"Between {first_year} and {latest_year}, <b>{selected_country}</b>'s <b>{selected_indicator}</b> changed by <b>{growth:.2f}%</b>."
+        st.markdown(f"<div class='insight-box'>{insight}</div>", unsafe_allow_html=True)
 
-if selected_indicator == "GDP (current US$)":
-    st.markdown("---")
-    st.subheader(f"🔮 GDP Forecast for {selected_country} (Next 4 Years)")
-    gdp_df = df[df["Country"] == selected_country][["Year", "GDP (current US$)"]].dropna()
-    gdp_df = gdp_df.rename(columns={"Year": "ds", "GDP (current US$)": "y"})
-    gdp_df["ds"] = pd.to_datetime(gdp_df["ds"], format="%Y")
+    with st.expander("View Raw Data"):
+        st.dataframe(filtered)
+        csv = filtered.to_csv(index=False).encode("utf-8")
+        st.download_button("Download Filtered CSV", csv, file_name=f"{selected_country}_{selected_indicator}.csv")
 
-    model = Prophet()
-    model.fit(gdp_df)
-    future = model.make_future_dataframe(periods=4, freq='Y')
-    forecast = model.predict(future)
+    # GDP Forecast Section
+    if selected_indicator == "GDP (current US$)":
+        st.markdown("---")
+        st.subheader(f"GDP Forecast for {selected_country} (Next 4 Years)")
 
-    fig1 = model.plot(forecast)
-    st.pyplot(fig1)
+        gdp_df = df[df["Country"] == selected_country][["Year", "GDP (current US$)"]].dropna()
+        gdp_df = gdp_df.rename(columns={"Year": "ds", "GDP (current US$)": "y"})
+        gdp_df["ds"] = pd.to_datetime(gdp_df["ds"], format="%Y")
 
-    forecast_output = forecast[["ds", "yhat", "yhat_lower", "yhat_upper"]].tail(4).rename(columns={
-        "ds": "Year",
-        "yhat": "Predicted GDP",
-        "yhat_lower": "Lower Bound",
-        "yhat_upper": "Upper Bound"
-    })
-    forecast_output["Year"] = forecast_output["Year"].dt.year
+        model = Prophet()
+        model.fit(gdp_df)
+        future = model.make_future_dataframe(periods=4, freq="Y")
+        forecast = model.predict(future)
 
-    st.dataframe(forecast_output)
-    forecast_csv = forecast_output.to_csv(index=False).encode('utf-8')
-    st.download_button("⬇️ Download Forecast CSV", forecast_csv, file_name=f"{selected_country}_GDP_forecast.csv")
+        fig1 = model.plot(forecast)
+        st.pyplot(fig1)
 
-st.markdown("""
+        forecast_df = forecast[["ds", "yhat", "yhat_lower", "yhat_upper"]].tail(4)
+        forecast_df = forecast_df.rename(columns={
+            "ds": "Year",
+            "yhat": "Predicted GDP",
+            "yhat_lower": "Lower Bound",
+            "yhat_upper": "Upper Bound"
+        })
+        forecast_df["Year"] = forecast_df["Year"].dt.year
+
+        st.dataframe(forecast_df)
+        forecast_csv = forecast_df.to_csv(index=False).encode("utf-8")
+        st.download_button("Download Forecast CSV", forecast_csv, file_name=f"{selected_country}_GDP_forecast.csv")
+
+# Compare Countries Tab
+with tabs[1]:
+    multi_countries = st.multiselect("Select countries to compare", countries, default=["United States", "India"])
+    if multi_countries:
+        compare_df = df[df["Country"].isin(multi_countries)][["Country", "Year", selected_indicator]].dropna()
+        pivot_df = compare_df.pivot(index="Year", columns="Country", values=selected_indicator)
+        st.line_chart(pivot_df)
+        st.dataframe(pivot_df)
+
+# Footer
+st.markdown(f"""
     <div class='footer'>
-        Built by <a href='https://github.com/kashiruddinshaik' target='_blank'>Kashiruddin Shaik</a> | Powered by Streamlit + World Bank
-        <br>Last updated: {}
+        Built by <a href='https://github.com/kashiruddinshaik' target='_blank'>Kashiruddin Shaik</a> | Powered by Streamlit + World Bank<br>
+        Last updated: {datetime.today().strftime('%b %d, %Y')}
     </div>
-""".format(datetime.today().strftime("%b %d, %Y")), unsafe_allow_html=True)
+""", unsafe_allow_html=True)
