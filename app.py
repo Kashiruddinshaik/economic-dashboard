@@ -5,7 +5,7 @@ from datetime import datetime
 import openai
 import pycountry
 
-st.set_page_config(page_title="Global Economic Dashboard", layout="wide")
+st.set_page_config(page_title="Economic Dashboard", layout="wide")
 
 openai.api_key = st.secrets["OPENAI_API_KEY"]
 
