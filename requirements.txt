@@ -3,4 +3,4 @@ pandas
 matplotlib
 openai
 pycountry
-wbdata
+wbdata==0.3.0
