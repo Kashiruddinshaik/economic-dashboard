@@ -3,6 +3,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from prophet import Prophet
 from datetime import datetime
+import openai
+import os
 
 # App configuration
 st.set_page_config(page_title="Economic Dashboard", layout="wide")
@@ -62,6 +64,23 @@ with tabs[0]:
         growth = ((latest_value - first_value) / first_value) * 100
         insight = f"Between {first_year} and {latest_year}, <b>{selected_country}</b>'s <b>{selected_indicator}</b> changed by <b>{growth:.2f}%</b>."
         st.markdown(f"<div class='insight-box'>{insight}</div>", unsafe_allow_html=True)
+
+        # GPT Summary Button
+        if st.button("Generate AI Insight Summary"):
+            openai.api_key = st.secrets["OPENAI_API_KEY"]
+            prompt = f"Summarize the trend of {selected_indicator} for {selected_country} from {first_year} to {latest_year}."\
+                     f" Here is the data: {filtered.to_dict(orient='records')}"
+            try:
+                response = openai.ChatCompletion.create(
+                    model="gpt-3.5-turbo",
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.5,
+                    max_tokens=150
+                )
+                summary = response['choices'][0]['message']['content']
+                st.markdown(f"<div class='insight-box'>{summary}</div>", unsafe_allow_html=True)
+            except Exception as e:
+                st.error(f"Error generating summary: {e}")
 
     with st.expander("View Raw Data"):
         st.dataframe(filtered)
