@@ -5,39 +5,43 @@ from prophet import Prophet
 from datetime import datetime
 import openai
 
-st.set_page_config(page_title="Economic Dashboard", layout="centered")
+st.set_page_config(page_title="Economic Dashboard", layout="wide")
 
-# Custom styling
 st.markdown("""
     <style>
-        .main { background-color: #f7f7f7; }
-        .stApp { font-family: 'Segoe UI', sans-serif; }
-        .title-text { font-size: 2rem; font-weight: 600; margin-bottom: 1rem; color: #2c3e50; }
+        body, .main, .stApp {
+            background-color: #111;
+            color: #f0f0f0;
+            font-family: 'Segoe UI', sans-serif;
+        }
+        .title-text {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+        }
         .metric-box {
-            background-color: #ffffff;
+            background-color: #222;
             border-radius: 10px;
-            padding: 1rem;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+            padding: 1.5rem;
             text-align: center;
+            margin-top: 1rem;
         }
         .insight-box {
-            background-color: #f1f1f1;
-            border-left: 5px solid #4CAF50;
+            background-color: #1b1e23;
+            border-left: 5px solid #2ecc71;
             padding: 1rem;
             margin-top: 1rem;
-            font-size: 1rem;
             border-radius: 5px;
         }
         .footer {
             font-size: 0.9rem;
-            margin-top: 3rem;
             text-align: center;
             color: #888;
+            margin-top: 3rem;
         }
     </style>
 """, unsafe_allow_html=True)
 
-# Load data
 try:
     df = pd.read_csv("data/clean_economic_data.csv")
     df = df[df["Country"].notnull()]
@@ -47,7 +51,6 @@ except Exception as e:
     st.error(f"Error loading data: {e}")
     st.stop()
 
-# Sidebar selections
 st.sidebar.title("🌍 Economic Dashboard")
 st.sidebar.write("Analyze key economic indicators by country from 2000 onwards.")
 countries = sorted(df["Country"].dropna().unique())
@@ -55,24 +58,21 @@ indicators = df.columns[2:]
 selected_indicator = st.sidebar.selectbox("Select an indicator", indicators)
 selected_country = st.sidebar.selectbox("Select a country", countries)
 
-# Filtered data for display
 filtered = df[df["Country"] == selected_country][["Year", selected_indicator]].dropna()
+
 st.markdown(f"<div class='title-text'>{selected_country} – {selected_indicator} Over Time</div>", unsafe_allow_html=True)
 st.line_chart(filtered.set_index("Year"))
 
-# Latest metric
 latest_year = filtered["Year"].max()
 latest_value = filtered[filtered["Year"] == latest_year][selected_indicator].values[0]
-st.markdown(f"<div class='metric-box'><h3>Latest Value ({latest_year})</h3><h2>{latest_value:,.2f}</h2></div>", unsafe_allow_html=True)
+st.markdown(f"<div class='metric-box'><h4>Latest Value ({latest_year})</h4><h2>{latest_value:,.2f}</h2></div>", unsafe_allow_html=True)
 
-# Growth insight
 first_year = filtered["Year"].min()
 first_value = filtered[filtered["Year"] == first_year][selected_indicator].values[0]
 growth = ((latest_value - first_value) / first_value) * 100
 insight = f"Between {first_year} and {latest_year}, <b>{selected_country}</b>'s <b>{selected_indicator}</b> changed by <b>{growth:.2f}%</b>."
 st.markdown(f"<div class='insight-box'>{insight}</div>", unsafe_allow_html=True)
 
-# OpenAI insight generation
 if st.button("Generate AI Insight Summary"):
     try:
         openai.api_key = st.secrets["OPENAI_API_KEY"]
@@ -88,13 +88,11 @@ if st.button("Generate AI Insight Summary"):
     except Exception as e:
         st.error(f"Error generating summary: {e}")
 
-# Raw data display
 with st.expander("🔎 View Raw Data"):
     st.dataframe(filtered)
     csv = filtered.to_csv(index=False).encode("utf-8")
     st.download_button("📥 Download Filtered CSV", csv, file_name=f"{selected_country}_{selected_indicator}.csv")
 
-# Forecasting if GDP selected
 if selected_indicator == "GDP (current US$)":
     st.markdown("---")
     st.subheader(f"📈 GDP Forecast for {selected_country} (Next 4 Years)")
@@ -122,7 +120,6 @@ if selected_indicator == "GDP (current US$)":
     forecast_csv = forecast_df.to_csv(index=False).encode("utf-8")
     st.download_button("📥 Download Forecast CSV", forecast_csv, file_name=f"{selected_country}_GDP_forecast.csv")
 
-# Country comparison chart
 st.markdown("---")
 st.subheader(f"🌐 Compare {selected_indicator} Across Countries")
 multi_countries = st.multiselect("Select countries to compare", countries)
@@ -132,10 +129,10 @@ if multi_countries:
     st.line_chart(pivot_df)
     st.dataframe(pivot_df)
 
-# Footer
 st.markdown(f"""
     <div class='footer'>
-        Built by <a href='https://github.com/kashiruddinshaik' target='_blank'>Kashiruddin Shaik</a> | Powered by Streamlit + World Bank<br>
+        Built by <a href='https://github.com/kashiruddinshaik' target='_blank'>Kashiruddin Shaik</a> |
+        Powered by Streamlit + World Bank<br>
         Last updated: {datetime.today().strftime('%b %d, %Y')}
     </div>
 """, unsafe_allow_html=True)
