@@ -1,4 +1,3 @@
-# app.py – Pro Version 🌍💼
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -6,10 +5,8 @@ from prophet import Prophet
 from datetime import datetime
 import base64
 
-# Streamlit page config
 st.set_page_config(page_title="🌍 Economic Dashboard", layout="wide")
 
-# Custom styles
 st.markdown("""
     <style>
         .main { background-color: #0e1117; color: white; }
@@ -18,10 +15,10 @@ st.markdown("""
         .title-text { font-size: 2.2rem; font-weight: bold; margin-bottom: 0.5rem; }
         .footer { font-size: 0.8rem; margin-top: 3rem; text-align: center; color: gray; }
         .metric-box { background-color: #1e1e1e; border-radius: 12px; padding: 1rem; text-align: center; margin-bottom: 1rem; }
+        .insight-box { background-color: #262730; border-left: 6px solid #4CAF50; border-radius: 8px; padding: 1rem; margin-top: 1rem; font-size: 1rem; }
     </style>
 """, unsafe_allow_html=True)
 
-# Load data with error handling and preview
 try:
     df = pd.read_csv("data/clean_economic_data.csv")
     df = df[df["Country"].notnull()]
@@ -31,7 +28,6 @@ except Exception as e:
     st.error(f"❌ Error loading data: {e}")
     st.stop()
 
-# Sidebar
 st.sidebar.title("📊 Economic Dashboard")
 st.sidebar.markdown("Analyze key economic indicators by country from 2000 onwards.")
 
@@ -40,7 +36,6 @@ selected_country = st.sidebar.selectbox("🌐 Select a country", countries)
 indicators = df.columns[2:]
 selected_indicator = st.sidebar.selectbox("📈 Select an indicator", indicators)
 
-# Main view layout
 col1, col2 = st.columns([2, 1])
 
 with col1:
@@ -49,19 +44,22 @@ with col1:
     st.line_chart(filtered.set_index("Year"))
 
 with col2:
-    # Show key stats for current country/indicator
     latest_year = filtered["Year"].max()
     latest_value = filtered[filtered["Year"] == latest_year][selected_indicator].values[0]
     st.markdown(f"### 📌 Latest Value ({latest_year})")
     st.markdown(f"<div class='metric-box'><h2>{latest_value:,.2f}</h2></div>", unsafe_allow_html=True)
 
-# Data Table
+    first_year = filtered["Year"].min()
+    first_value = filtered[filtered["Year"] == first_year][selected_indicator].values[0]
+    growth = ((latest_value - first_value) / first_value) * 100
+    insight_text = f"Between {first_year} and {latest_year}, <b>{selected_country}</b>'s <b>{selected_indicator}</b> changed by <b>{growth:.2f}%</b>."
+    st.markdown(f"<div class='insight-box'>{insight_text}</div>", unsafe_allow_html=True)
+
 with st.expander("📄 View Raw Data"):
     st.dataframe(filtered)
     csv = filtered.to_csv(index=False).encode('utf-8')
     st.download_button("⬇️ Download Filtered CSV", csv, file_name=f"{selected_country}_{selected_indicator}.csv")
 
-# GDP Forecast (Prophet)
 if selected_indicator == "GDP (current US$)":
     st.markdown("---")
     st.subheader(f"🔮 GDP Forecast for {selected_country} (Next 4 Years)")
@@ -89,7 +87,6 @@ if selected_indicator == "GDP (current US$)":
     forecast_csv = forecast_output.to_csv(index=False).encode('utf-8')
     st.download_button("⬇️ Download Forecast CSV", forecast_csv, file_name=f"{selected_country}_GDP_forecast.csv")
 
-# Footer
 st.markdown("""
     <div class='footer'>
         Built by <a href='https://github.com/kashiruddinshaik' target='_blank'>Kashiruddin Shaik</a> | Powered by Streamlit + World Bank
