@@ -40,9 +40,7 @@ Pandas
 Matplotlib
 Prophet
 
-👤 Author :
-
-Kashiruddin Shaik
+👤 Author :Kashiruddin Shaik
 
 Linkedin : https://www.linkedin.com/in/kashiruddin-shaik/
 
