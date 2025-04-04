@@ -3,11 +3,12 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from prophet import Prophet
 from datetime import datetime
-import openai
-import os
+from openai import OpenAI
 
+# Streamlit setup
 st.set_page_config(page_title="Economic Dashboard", layout="wide")
 
+# Styling
 st.markdown("""
     <style>
         .main { background-color: #0e1117; color: white; }
@@ -20,6 +21,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# Load dataset
 try:
     df = pd.read_csv("data/clean_economic_data.csv")
     df = df[df["Country"].notnull()]
@@ -29,22 +31,24 @@ except Exception as e:
     st.error(f"Error loading data: {e}")
     st.stop()
 
+# Sidebar
 st.sidebar.title("Economic Dashboard")
 st.sidebar.markdown("Analyze key economic indicators by country from 2000 onwards.")
-
 countries = sorted(df["Country"].dropna().unique())
 indicators = df.columns[2:]
 selected_indicator = st.sidebar.selectbox("Select an indicator", indicators)
-
 selected_country = st.sidebar.selectbox("Select a country", countries)
 
+# Layout
 col1, col2 = st.columns([2, 1])
+filtered = df[df["Country"] == selected_country][["Year", selected_indicator]].dropna()
 
+# Line chart
 with col1:
     st.markdown(f"<div class='title-text'>{selected_country} – {selected_indicator} Over Time</div>", unsafe_allow_html=True)
-    filtered = df[df["Country"] == selected_country][["Year", selected_indicator]].dropna()
     st.line_chart(filtered.set_index("Year"))
 
+# Metric + AI Summary
 with col2:
     latest_year = filtered["Year"].max()
     latest_value = filtered[filtered["Year"] == latest_year][selected_indicator].values[0]
@@ -57,30 +61,32 @@ with col2:
     insight = f"Between {first_year} and {latest_year}, <b>{selected_country}</b>'s <b>{selected_indicator}</b> changed by <b>{growth:.2f}%</b>."
     st.markdown(f"<div class='insight-box'>{insight}</div>", unsafe_allow_html=True)
 
+    # AI Summary
     if st.button("Generate AI Insight Summary"):
-        openai.api_key = st.secrets["OPENAI_API_KEY"]
-        prompt = f"Summarize the trend of {selected_indicator} for {selected_country} from {first_year} to {latest_year}. Data: {filtered.to_dict(orient='records')}"
         try:
-            response = openai.ChatCompletion.create(
+            client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+            prompt = f"Summarize the trend of {selected_indicator} for {selected_country} from {first_year} to {latest_year}. Data: {filtered.to_dict(orient='records')}"
+            response = client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.5,
                 max_tokens=150
             )
-            summary = response['choices'][0]['message']['content']
+            summary = response.choices[0].message.content
             st.markdown(f"<div class='insight-box'>{summary}</div>", unsafe_allow_html=True)
         except Exception as e:
             st.error(f"Error generating summary: {e}")
 
+# View Raw Data
 with st.expander("View Raw Data"):
     st.dataframe(filtered)
     csv = filtered.to_csv(index=False).encode("utf-8")
     st.download_button("Download Filtered CSV", csv, file_name=f"{selected_country}_{selected_indicator}.csv")
 
+# GDP Forecast using Prophet
 if selected_indicator == "GDP (current US$)":
     st.markdown("---")
     st.subheader(f"GDP Forecast for {selected_country} (Next 4 Years)")
-
     gdp_df = df[df["Country"] == selected_country][["Year", "GDP (current US$)"]].dropna()
     gdp_df = gdp_df.rename(columns={"Year": "ds", "GDP (current US$)": "y"})
     gdp_df["ds"] = pd.to_datetime(gdp_df["ds"], format="%Y")
@@ -106,16 +112,18 @@ if selected_indicator == "GDP (current US$)":
     forecast_csv = forecast_df.to_csv(index=False).encode("utf-8")
     st.download_button("Download Forecast CSV", forecast_csv, file_name=f"{selected_country}_GDP_forecast.csv")
 
+# Country comparison
 st.markdown("---")
 st.subheader(f"Compare {selected_indicator} Across Countries")
-
 multi_countries = st.multiselect("Select countries to compare", countries)
+
 if multi_countries:
     compare_df = df[df["Country"].isin(multi_countries)][["Country", "Year", selected_indicator]].dropna()
     pivot_df = compare_df.pivot(index="Year", columns="Country", values=selected_indicator)
     st.line_chart(pivot_df)
     st.dataframe(pivot_df)
 
+# Footer
 st.markdown(f"""
     <div class='footer'>
         Built by <a href='https://github.com/kashiruddinshaik' target='_blank'>Kashiruddin Shaik</a> | Powered by Streamlit + World Bank<br>
