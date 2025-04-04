@@ -20,9 +20,9 @@ def load_data():
         "SL.UEM.TOTL.ZS": "Unemployment (%)",
         "NE.EXP.GNFS.ZS": "Exports (% of GDP)"
     }
-    # Get country ISO codes properly
-    country_codes = [country['iso2Code'] for country in wbdata.get_country()]
-    
+    # Fix: access country codes using attributes, not dict-style
+    country_codes = [country.id for country in wbdata.get_country()]
+
     df = wbdata.get_dataframe(
         indicators,
         country=country_codes,
@@ -38,15 +38,12 @@ def load_data():
 # Generate AI-based insight using OpenAI
 @st.cache_data(show_spinner=False)
 def generate_ai_insight(text):
-    try:
-        prompt = f"Generate a summary for this economic indicator trend:\n{text}"
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": prompt}]
-        )
-        return response['choices'][0]['message']['content']
-    except Exception as e:
-        return f"Error generating insight: {str(e)}"
+    prompt = f"Generate a summary for this economic indicator trend:\n{text}"
+    response = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "user", "content": prompt}]
+    )
+    return response['choices'][0]['message']['content']
 
 # Load data
 df = load_data()
@@ -63,26 +60,20 @@ selected_country = st.sidebar.selectbox("Select a country", sorted(df["Country"]
 country_df = df[df["Country"] == selected_country][["Year", selected_indicator]].dropna()
 
 # Main Panel
-if country_df.empty:
-    st.warning(f"No data available for {selected_country} and {selected_indicator}.")
-else:
-    st.markdown(f"### {selected_country} - {selected_indicator} Over Time")
-    st.line_chart(data=country_df, x="Year", y=selected_indicator)
+st.markdown(f"### {selected_country} - {selected_indicator} Over Time")
+st.line_chart(data=country_df, x="Year", y=selected_indicator)
 
-    latest_year = country_df["Year"].max()
-    latest_value = country_df[country_df["Year"] == latest_year][selected_indicator].values[0]
-    initial_year = country_df["Year"].min()
-    initial_value = country_df[country_df["Year"] == initial_year][selected_indicator].values[0]
-    if initial_value == 0:
-        percentage_change = 0
-    else:
-        percentage_change = ((latest_value - initial_value) / initial_value) * 100
+latest_year = country_df["Year"].max()
+latest_value = country_df[country_df["Year"] == latest_year][selected_indicator].values[0]
+initial_year = country_df["Year"].min()
+initial_value = country_df[country_df["Year"] == initial_year][selected_indicator].values[0]
+percentage_change = ((latest_value - initial_value) / initial_value) * 100
 
-    st.metric(
-        label=f"Latest Value ({latest_year})",
-        value=f"{latest_value:,.2f}",
-        delta=f"{percentage_change:.2f}% change since {initial_year}"
-    )
+st.metric(
+    label=f"Latest Value ({latest_year})",
+    value=f"{latest_value:,.2f}",
+    delta=f"{percentage_change:.2f}% change since {initial_year}"
+)
 
 # AI Summary
 if st.button("Generate AI Insight Summary"):
