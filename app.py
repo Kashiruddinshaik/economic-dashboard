@@ -12,6 +12,7 @@ st.set_page_config(page_title="Economic Dashboard", layout="wide")
 openai.api_key = st.secrets["OPENAI_API_KEY"]
 
 # Fetch data from World Bank
+# Fetch data from World Bank
 @st.cache_data(ttl=86400)
 def load_data():
     indicators = {
@@ -20,7 +21,9 @@ def load_data():
         "SL.UEM.TOTL.ZS": "Unemployment (%)",
         "NE.EXP.GNFS.ZS": "Exports (% of GDP)"
     }
-    country_codes = [country['id'] for country in wbdata.get_country(display=False)]
+    # Get country ISO codes properly
+    country_codes = [country.iso2c for country in wbdata.get_country()]
+    
     df = wbdata.get_dataframe(
         indicators,
         country=country_codes,
@@ -32,6 +35,7 @@ def load_data():
     df["Year"] = pd.to_datetime(df["Year"]).dt.year
     df = df[df["Year"] >= 2000]
     return df
+
 
 # Generate AI-based insight using OpenAI
 @st.cache_data(show_spinner=False)
