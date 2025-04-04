@@ -7,13 +7,10 @@ import openai
 
 st.set_page_config(page_title="Economic Dashboard", layout="wide")
 
-# Load OpenAI API key
 openai.api_key = st.secrets["OPENAI_API_KEY"]
 
-# Custom CSS styling
 st.markdown("""
     <style>
-        .main { background-color: #f7f7f7; }
         .stApp { font-family: 'Segoe UI', sans-serif; }
         .metric-card {
             background-color: #1c1c1c;
@@ -39,7 +36,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Load and preprocess data
 def load_data():
     df = pd.read_csv("data/clean_economic_data.csv")
     df = df[df["Country"].notnull()]
@@ -50,13 +46,11 @@ df = load_data()
 countries = sorted(df["Country"].unique())
 indicators = df.columns[2:]
 
-# Sidebar
 st.sidebar.title("🌐 Economic Dashboard")
 st.sidebar.caption("Analyze key economic indicators by country from 2000 onwards.")
 selected_indicator = st.sidebar.selectbox("Select an indicator", indicators)
 selected_country = st.sidebar.selectbox("Select a country", countries)
 
-# Filter data
 filtered = df[df["Country"] == selected_country][["Year", selected_indicator]].dropna()
 first_year = filtered["Year"].min()
 latest_year = filtered["Year"].max()
@@ -64,10 +58,8 @@ first_value = filtered[filtered["Year"] == first_year][selected_indicator].value
 latest_value = filtered[filtered["Year"] == latest_year][selected_indicator].values[0]
 growth = ((latest_value - first_value) / first_value) * 100
 
-# Tabs
 overview_tab, ai_tab, forecast_tab, compare_tab = st.tabs(["📈 Overview", "🤖 AI Insight", "🔮 Forecast", "🌍 Country Comparison"])
 
-# Overview Tab
 with overview_tab:
     st.markdown(f"## {selected_country} – {selected_indicator} Over Time")
     st.line_chart(filtered.set_index("Year"))
@@ -78,7 +70,6 @@ with overview_tab:
         csv = filtered.to_csv(index=False).encode("utf-8")
         st.download_button("📥 Download Filtered CSV", csv, file_name=f"{selected_country}_{selected_indicator}.csv")
 
-# AI Insight Tab
 with ai_tab:
     st.markdown("## 🧠 AI-generated Insight")
     if st.button("Generate AI Insight Summary"):
@@ -95,7 +86,6 @@ with ai_tab:
         except Exception as e:
             st.error(f"Error generating summary: {e}")
 
-# Forecast Tab
 with forecast_tab:
     if selected_indicator == "GDP (current US$)":
         st.markdown(f"## 📈 GDP Forecast for {selected_country} (Next 4 Years)")
@@ -108,21 +98,14 @@ with forecast_tab:
         future = model.make_future_dataframe(periods=4, freq="Y")
         forecast = model.predict(future)
 
-        fig = model.plot(forecast)
-        fig.patch.set_facecolor('#0e1117')
-        ax = fig.gca()
-        ax.set_title(f"{selected_country} GDP Forecast", fontsize=14)
-        ax.set_ylabel("GDP (US$)")
-        ax.set_xlabel("Year")
+        fig = plt.figure(figsize=(10, 5))
+        model.plot(forecast, xlabel='Year', ylabel='GDP (US$)', ax=fig.gca())
+        plt.title(f"GDP Forecast for {selected_country}", fontsize=16)
+        plt.grid(True)
         st.pyplot(fig)
 
         forecast_df = forecast[["ds", "yhat", "yhat_lower", "yhat_upper"]].tail(4)
-        forecast_df = forecast_df.rename(columns={
-            "ds": "Year",
-            "yhat": "Predicted GDP",
-            "yhat_lower": "Lower Bound",
-            "yhat_upper": "Upper Bound"
-        })
+        forecast_df.columns = ["Year", "Predicted GDP", "Lower Bound", "Upper Bound"]
         forecast_df["Year"] = forecast_df["Year"].dt.year
         st.dataframe(forecast_df)
         forecast_csv = forecast_df.to_csv(index=False).encode("utf-8")
@@ -130,7 +113,6 @@ with forecast_tab:
     else:
         st.info("GDP Forecasting is only available when 'GDP (current US$)' is selected.")
 
-# Country Comparison
 with compare_tab:
     st.markdown("## 🌍 Country Comparison")
     multi_countries = st.multiselect("Select countries to compare", countries)
@@ -140,7 +122,6 @@ with compare_tab:
         st.line_chart(pivot_df)
         st.dataframe(pivot_df)
 
-# Footer
 st.markdown(f"""
     <div class='footer'>
         Built by <a href='https://github.com/kashiruddinshaik' target='_blank'>Kashiruddin Shaik</a> — Powered by Streamlit & World Bank<br>
