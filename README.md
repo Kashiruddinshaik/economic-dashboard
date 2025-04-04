@@ -43,7 +43,7 @@ Prophet
 👤 Author :
 Kashiruddin Shaik
 
-GitHub: https://github.com/kashiruddinshaik
+Linkedin : https://www.linkedin.com/in/kashiruddin-shaik/
 
 
 
