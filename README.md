@@ -35,7 +35,8 @@ Pandas
 Matplotlib
 Prophet
 
-👤 Author :Kashiruddin Shaik
+👤 Author :
+Kashiruddin Shaik
 GitHub: https://github.com/kashiruddinshaik
 
 
