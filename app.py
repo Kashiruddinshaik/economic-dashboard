@@ -7,10 +7,8 @@ import openai
 
 st.set_page_config(page_title="Economic Dashboard", layout="wide")
 
-# Load OpenAI API key
 openai.api_key = st.secrets["OPENAI_API_KEY"]
 
-# Custom CSS styling
 st.markdown("""
     <style>
         .main { background-color: #f7f7f7; }
@@ -39,7 +37,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Load and preprocess data
 def load_data():
     df = pd.read_csv("data/clean_economic_data.csv")
     df = df[df["Country"].notnull()]
@@ -50,7 +47,6 @@ df = load_data()
 countries = sorted(df["Country"].unique())
 indicators = df.columns[2:]
 
-# App layout
 st.sidebar.title("🌐 Economic Dashboard")
 st.sidebar.caption("Analyze key economic indicators by country from 2000 onwards.")
 selected_indicator = st.sidebar.selectbox("Select an indicator", indicators)
@@ -63,7 +59,6 @@ first_value = filtered[filtered["Year"] == first_year][selected_indicator].value
 latest_value = filtered[filtered["Year"] == latest_year][selected_indicator].values[0]
 growth = ((latest_value - first_value) / first_value) * 100
 
-# Tabs layout
 overview_tab, ai_tab, forecast_tab, compare_tab = st.tabs(["📈 Overview", "🤖 AI Insight", "🔮 Forecast", "🌍 Country Comparison"])
 
 with overview_tab:
@@ -104,13 +99,13 @@ with forecast_tab:
         future = model.make_future_dataframe(periods=4, freq="Y")
         forecast = model.predict(future)
 
-        fig = model.plot(forecast)
-        fig.patch.set_facecolor('#0e1117')
-        ax = fig.gca()
-        ax.set_title(f"{selected_country} GDP Forecast", fontsize=14)
-        ax.set_ylabel("GDP (US$)")
+        fig, ax = plt.subplots(figsize=(10, 5))
+        model.plot(forecast, ax=ax)
+        ax.set_title(f"{selected_country} GDP Forecast (Next 4 Years)", fontsize=14)
         ax.set_xlabel("Year")
-        st.pyplot(fig)
+        ax.set_ylabel("GDP (US$)")
+        fig.tight_layout()
+        st.pyplot(fig, use_container_width=True)
 
         forecast_df = forecast[["ds", "yhat", "yhat_lower", "yhat_upper"]].tail(4)
         forecast_df = forecast_df.rename(columns={
@@ -135,7 +130,6 @@ with compare_tab:
         st.line_chart(pivot_df)
         st.dataframe(pivot_df)
 
-# Footer
 st.markdown(f"""
     <div class='footer'>
         Built by <a href='https://github.com/kashiruddinshaik' target='_blank'>Kashiruddin Shaik</a> — Powered by Streamlit & World Bank<br>
