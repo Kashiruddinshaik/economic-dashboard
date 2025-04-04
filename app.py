@@ -50,13 +50,12 @@ df = load_data()
 countries = sorted(df["Country"].unique())
 indicators = df.columns[2:]
 
-# Sidebar
+# App layout
 st.sidebar.title("🌐 Economic Dashboard")
 st.sidebar.caption("Analyze key economic indicators by country from 2000 onwards.")
 selected_indicator = st.sidebar.selectbox("Select an indicator", indicators)
 selected_country = st.sidebar.selectbox("Select a country", countries)
 
-# Filter data
 filtered = df[df["Country"] == selected_country][["Year", selected_indicator]].dropna()
 first_year = filtered["Year"].min()
 latest_year = filtered["Year"].max()
@@ -64,21 +63,19 @@ first_value = filtered[filtered["Year"] == first_year][selected_indicator].value
 latest_value = filtered[filtered["Year"] == latest_year][selected_indicator].values[0]
 growth = ((latest_value - first_value) / first_value) * 100
 
-# Tabs
+# Tabs layout
 overview_tab, ai_tab, forecast_tab, compare_tab = st.tabs(["📈 Overview", "🤖 AI Insight", "🔮 Forecast", "🌍 Country Comparison"])
 
-# Overview Tab
 with overview_tab:
     st.markdown(f"## {selected_country} – {selected_indicator} Over Time")
     st.line_chart(filtered.set_index("Year"))
     st.markdown(f"<div class='metric-card'><h4>Latest Value ({latest_year})</h4><h2>{latest_value:,.2f}</h2></div>", unsafe_allow_html=True)
     st.markdown(f"<div class='summary-box'>Between {first_year} and {latest_year}, <b>{selected_country}'s {selected_indicator}</b> changed by <b>{growth:.2f}%</b>.</div>", unsafe_allow_html=True)
-    with st.expander("🔍 View Raw Data"):
+    with st.expander("🔎 View Raw Data"):
         st.dataframe(filtered)
         csv = filtered.to_csv(index=False).encode("utf-8")
         st.download_button("📥 Download Filtered CSV", csv, file_name=f"{selected_country}_{selected_indicator}.csv")
 
-# AI Insight Tab
 with ai_tab:
     st.markdown("## 🧠 AI-generated Insight")
     if st.button("Generate AI Insight Summary"):
@@ -95,7 +92,6 @@ with ai_tab:
         except Exception as e:
             st.error(f"Error generating summary: {e}")
 
-# Forecast Tab
 with forecast_tab:
     if selected_indicator == "GDP (current US$)":
         st.markdown(f"## 📈 GDP Forecast for {selected_country} (Next 4 Years)")
@@ -130,7 +126,6 @@ with forecast_tab:
     else:
         st.info("GDP Forecasting is only available when 'GDP (current US$)' is selected.")
 
-# Country Comparison
 with compare_tab:
     st.markdown("## 🌍 Country Comparison")
     multi_countries = st.multiselect("Select countries to compare", countries)
