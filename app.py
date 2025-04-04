@@ -12,7 +12,6 @@ st.set_page_config(page_title="Economic Dashboard", layout="wide")
 openai.api_key = st.secrets["OPENAI_API_KEY"]
 
 # Fetch data from World Bank
-# Fetch data from World Bank
 @st.cache_data(ttl=86400)
 def load_data():
     indicators = {
@@ -22,7 +21,7 @@ def load_data():
         "NE.EXP.GNFS.ZS": "Exports (% of GDP)"
     }
     # Get country ISO codes properly
-    country_codes = [country.iso2c for country in wbdata.get_country()]
+    country_codes = [country['iso2Code'] for country in wbdata.get_country()]
     
     df = wbdata.get_dataframe(
         indicators,
@@ -36,16 +35,18 @@ def load_data():
     df = df[df["Year"] >= 2000]
     return df
 
-
 # Generate AI-based insight using OpenAI
 @st.cache_data(show_spinner=False)
 def generate_ai_insight(text):
-    prompt = f"Generate a summary for this economic indicator trend:\n{text}"
-    response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "user", "content": prompt}]
-    )
-    return response['choices'][0]['message']['content']
+    try:
+        prompt = f"Generate a summary for this economic indicator trend:\n{text}"
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return response['choices'][0]['message']['content']
+    except Exception as e:
+        return f"Error generating insight: {str(e)}"
 
 # Load data
 df = load_data()
@@ -62,20 +63,26 @@ selected_country = st.sidebar.selectbox("Select a country", sorted(df["Country"]
 country_df = df[df["Country"] == selected_country][["Year", selected_indicator]].dropna()
 
 # Main Panel
-st.markdown(f"### {selected_country} - {selected_indicator} Over Time")
-st.line_chart(data=country_df, x="Year", y=selected_indicator)
+if country_df.empty:
+    st.warning(f"No data available for {selected_country} and {selected_indicator}.")
+else:
+    st.markdown(f"### {selected_country} - {selected_indicator} Over Time")
+    st.line_chart(data=country_df, x="Year", y=selected_indicator)
 
-latest_year = country_df["Year"].max()
-latest_value = country_df[country_df["Year"] == latest_year][selected_indicator].values[0]
-initial_year = country_df["Year"].min()
-initial_value = country_df[country_df["Year"] == initial_year][selected_indicator].values[0]
-percentage_change = ((latest_value - initial_value) / initial_value) * 100
+    latest_year = country_df["Year"].max()
+    latest_value = country_df[country_df["Year"] == latest_year][selected_indicator].values[0]
+    initial_year = country_df["Year"].min()
+    initial_value = country_df[country_df["Year"] == initial_year][selected_indicator].values[0]
+    if initial_value == 0:
+        percentage_change = 0
+    else:
+        percentage_change = ((latest_value - initial_value) / initial_value) * 100
 
-st.metric(
-    label=f"Latest Value ({latest_year})",
-    value=f"{latest_value:,.2f}",
-    delta=f"{percentage_change:.2f}% change since {initial_year}"
-)
+    st.metric(
+        label=f"Latest Value ({latest_year})",
+        value=f"{latest_value:,.2f}",
+        delta=f"{percentage_change:.2f}% change since {initial_year}"
+    )
 
 # AI Summary
 if st.button("Generate AI Insight Summary"):
