@@ -89,7 +89,7 @@ growth = ((latest_value - first_value) / first_value) * 100
 flag = get_flag(selected_country)
 header_title = f"{flag} {selected_country} — {selected_indicator}"
 
-overview_tab, ai_tab, compare_tab = st.tabs(["Overview", "AI Insight", "Country Comparison"])
+overview_tab, ai_tab, compare_tab, ranking_tab = st.tabs(["Overview", "AI Insight", "Country Comparison", "Top Rankings"])
 
 with overview_tab:
     st.markdown(f"## {header_title}")
@@ -131,6 +131,14 @@ with compare_tab:
             pivot_df = compare_df.pivot(index="Year", columns="Country", values=selected_indicator)
             st.line_chart(pivot_df)
             st.dataframe(pivot_df)
+
+with ranking_tab:
+    st.markdown("## Top 10 Countries by Indicator")
+    rank_year = st.selectbox("Select Year", sorted(df["Year"].unique(), reverse=True))
+    ranked = df[df["Year"] == rank_year][["Country", selected_indicator]].dropna()
+    ranked = ranked.sort_values(by=selected_indicator, ascending=False).head(10)
+    st.bar_chart(ranked.set_index("Country"))
+    st.dataframe(ranked.reset_index(drop=True))
 
 st.markdown(f"""
     <div class='footer'>
