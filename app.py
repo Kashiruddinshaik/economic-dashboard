@@ -92,7 +92,7 @@ if selected_indicator == "GDP (current US$)":
 # Footer
 st.markdown("""
     <div class='footer'>
-        Built with ❤️ by <a href='https://github.com/kashiruddinshaik' target='_blank'>Kashiruddin Shaik</a> | Powered by Streamlit + World Bank
+        Built by <a href='https://github.com/kashiruddinshaik' target='_blank'>Kashiruddin Shaik</a> | Powered by Streamlit + World Bank
         <br>Last updated: {}
     </div>
 """.format(datetime.today().strftime("%b %d, %Y")), unsafe_allow_html=True)
