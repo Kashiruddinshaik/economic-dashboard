@@ -1,97 +1,98 @@
-# app.py
+# app.py – Pro Version 🌍💼
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 from prophet import Prophet
-import io
+from datetime import datetime
+import base64
 
 # Streamlit page config
-st.set_page_config(layout="wide")
+st.set_page_config(page_title="🌍 Economic Dashboard", layout="wide")
+
+# Custom styles
+st.markdown("""
+    <style>
+        .main { background-color: #0e1117; color: white; }
+        .stApp { font-family: 'Segoe UI', sans-serif; }
+        .block-container { padding: 2rem 2rem; }
+        .title-text { font-size: 2.2rem; font-weight: bold; margin-bottom: 0.5rem; }
+        .footer { font-size: 0.8rem; margin-top: 3rem; text-align: center; color: gray; }
+        .metric-box { background-color: #1e1e1e; border-radius: 12px; padding: 1rem; text-align: center; margin-bottom: 1rem; }
+    </style>
+""", unsafe_allow_html=True)
 
 # Load data with error handling and preview
 try:
     df = pd.read_csv("data/clean_economic_data.csv")
-
-    # Preview top rows to debug
-    st.write("📊 Preview of uploaded dataset:")
-    st.dataframe(df.head(10))
-
-    # Clean and filter dataset
     df = df[df["Country"].notnull()]
     df["Year"] = df["Year"].astype(str).str.replace(",", "").astype(int)
     df = df[df["Year"] >= 2000]
-
 except Exception as e:
     st.error(f"❌ Error loading data: {e}")
     st.stop()
 
-# Sidebar controls
-st.sidebar.title("🌍 Economic Dashboard")
-countries = df["Country"].dropna().unique()
-if len(countries) == 0:
-    st.error("No data available. Please check your dataset.")
-    st.stop()
+# Sidebar
+st.sidebar.title("📊 Economic Dashboard")
+st.sidebar.markdown("Analyze key economic indicators by country from 2000 onwards.")
 
-selected_country = st.sidebar.selectbox("Select a country", countries)
-selected_indicator = st.sidebar.selectbox("Select an indicator", df.columns[2:])
+countries = sorted(df["Country"].unique())
+selected_country = st.sidebar.selectbox("🌐 Select a country", countries)
+indicators = df.columns[2:]
+selected_indicator = st.sidebar.selectbox("📈 Select an indicator", indicators)
 
-# Main plot section
-filtered = df[df["Country"] == selected_country][["Year", selected_indicator]].dropna()
+# Main view layout
+col1, col2 = st.columns([2, 1])
 
-st.title(f"{selected_country} - {selected_indicator} Over Time")
-st.line_chart(filtered.set_index("Year"))
+with col1:
+    st.markdown(f"<div class='title-text'>{selected_country} – {selected_indicator} Over Time</div>", unsafe_allow_html=True)
+    filtered = df[df["Country"] == selected_country][["Year", selected_indicator]].dropna()
+    st.line_chart(filtered.set_index("Year"))
 
-# Expand raw data
-with st.expander("📄 Show raw data"):
+with col2:
+    # Show key stats for current country/indicator
+    latest_year = filtered["Year"].max()
+    latest_value = filtered[filtered["Year"] == latest_year][selected_indicator].values[0]
+    st.markdown(f"### 📌 Latest Value ({latest_year})")
+    st.markdown(f"<div class='metric-box'><h2>{latest_value:,.2f}</h2></div>", unsafe_allow_html=True)
+
+# Data Table
+with st.expander("📄 View Raw Data"):
     st.dataframe(filtered)
+    csv = filtered.to_csv(index=False).encode('utf-8')
+    st.download_button("⬇️ Download Filtered CSV", csv, file_name=f"{selected_country}_{selected_indicator}.csv")
 
-# Download button for filtered data
-csv = filtered.to_csv(index=False).encode('utf-8')
-st.download_button(
-    label="📥 Download Filtered Data as CSV",
-    data=csv,
-    file_name=f"{selected_country}_{selected_indicator}_data.csv",
-    mime='text/csv'
-)
-
-# Forecast section for GDP
+# GDP Forecast (Prophet)
 if selected_indicator == "GDP (current US$)":
-    st.subheader(f"🔮 GDP Forecast for {selected_country} (2024–2027)")
-
-    # Prepare GDP data for Prophet
+    st.markdown("---")
+    st.subheader(f"🔮 GDP Forecast for {selected_country} (Next 4 Years)")
     gdp_df = df[df["Country"] == selected_country][["Year", "GDP (current US$)"]].dropna()
     gdp_df = gdp_df.rename(columns={"Year": "ds", "GDP (current US$)": "y"})
     gdp_df["ds"] = pd.to_datetime(gdp_df["ds"], format="%Y")
 
-    # Build and train Prophet model
     model = Prophet()
     model.fit(gdp_df)
     future = model.make_future_dataframe(periods=4, freq='Y')
     forecast = model.predict(future)
 
-    # Plot forecast
     fig1 = model.plot(forecast)
     st.pyplot(fig1)
 
-    # Show forecasted values
     forecast_output = forecast[["ds", "yhat", "yhat_lower", "yhat_upper"]].tail(4).rename(columns={
         "ds": "Year",
         "yhat": "Predicted GDP",
         "yhat_lower": "Lower Bound",
         "yhat_upper": "Upper Bound"
     })
+    forecast_output["Year"] = forecast_output["Year"].dt.year
 
-    st.write("### Forecasted GDP:")
     st.dataframe(forecast_output)
-
-    # Download button for forecast
     forecast_csv = forecast_output.to_csv(index=False).encode('utf-8')
-    st.download_button(
-        label="📥 Download Forecast as CSV",
-        data=forecast_csv,
-        file_name=f"{selected_country}_GDP_forecast.csv",
-        mime='text/csv'
-    )
+    st.download_button("⬇️ Download Forecast CSV", forecast_csv, file_name=f"{selected_country}_GDP_forecast.csv")
 
 # Footer
-st.caption("Built with Streamlit | Data Source: World Bank")
+st.markdown("""
+    <div class='footer'>
+        Built with ❤️ by <a href='https://github.com/kashiruddinshaik' target='_blank'>Kashiruddin Shaik</a> | Powered by Streamlit + World Bank
+        <br>Last updated: {}
+    </div>
+""".format(datetime.today().strftime("%b %d, %Y")), unsafe_allow_html=True)
