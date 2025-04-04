@@ -71,7 +71,7 @@ def load_data():
     return df[df["Year"] >= 2000]
 
 df = load_data()
-countries = sorted(df["Country"].unique())
+countries = sorted(df["Country"].dropna().unique().tolist())
 indicators = df.columns[2:]
 
 st.sidebar.title("Navigation")
