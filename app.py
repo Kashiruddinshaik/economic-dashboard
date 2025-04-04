@@ -48,6 +48,9 @@ def load_data():
             data_date=(datetime(2000, 1, 1), datetime.today()),
             convert_date=True
         )
+        if df.empty:
+            raise ValueError("No data retrieved from wbdata.get_dataframe()")
+        
         df.reset_index(inplace=True)
         df.rename(columns={"country": "Country", "date": "Year"}, inplace=True)
         df["Year"] = pd.to_datetime(df["Year"]).dt.year
