@@ -10,7 +10,6 @@ openai.api_key = st.secrets["OPENAI_API_KEY"]
 
 st.markdown("""
     <style>
-        .main { background-color: #f7f7f7; }
         .stApp { font-family: 'Segoe UI', sans-serif; }
         .metric-card {
             background-color: #1c1c1c;
@@ -18,6 +17,7 @@ st.markdown("""
             border-radius: 10px;
             text-align: center;
             color: white;
+            margin-bottom: 1rem;
         }
         .summary-box {
             background-color: #222;
@@ -26,6 +26,7 @@ st.markdown("""
             border-left: 6px solid #4CAF50;
             font-size: 1rem;
             color: white;
+            margin-top: 1rem;
         }
         .footer {
             font-size: 0.9rem;
@@ -33,7 +34,26 @@ st.markdown("""
             text-align: center;
             color: #888;
         }
+        .title-section {
+            text-align: center;
+            margin-top: 1rem;
+        }
+        .title-section h1 {
+            font-size: 2.5rem;
+            color: #00BFFF;
+        }
+        .title-section p {
+            font-size: 1.1rem;
+            color: #bbb;
+        }
     </style>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+    <div class="title-section">
+        <h1>🌍 Global Economic Dashboard</h1>
+        <p>Visualize and analyze key economic indicators across countries</p>
+    </div>
 """, unsafe_allow_html=True)
 
 def load_data():
@@ -46,8 +66,8 @@ df = load_data()
 countries = sorted(df["Country"].unique())
 indicators = df.columns[2:]
 
-st.sidebar.title("🌐 Economic Dashboard")
-st.sidebar.caption("Analyze key economic indicators by country from 2000 onwards.")
+st.sidebar.title("🧭 Navigation")
+st.sidebar.caption("Choose country and indicator")
 selected_indicator = st.sidebar.selectbox("Select an indicator", indicators)
 selected_country = st.sidebar.selectbox("Select a country", countries)
 
@@ -58,12 +78,14 @@ first_value = filtered[filtered["Year"] == first_year][selected_indicator].value
 latest_value = filtered[filtered["Year"] == latest_year][selected_indicator].values[0]
 growth = ((latest_value - first_value) / first_value) * 100
 
-overview_tab, ai_tab, compare_tab = st.tabs(["📈 Overview", "🤖 AI Insight", "🌍 Country Comparison"])
+overview_tab, ai_tab, compare_tab = st.tabs(["📊 Overview", "🧠 AI Insight", "🌐 Country Comparison"])
 
 with overview_tab:
     st.markdown(f"## {selected_country} – {selected_indicator} Over Time")
     st.line_chart(filtered.set_index("Year"))
-    st.markdown(f"<div class='metric-card'><h4>Latest Value ({latest_year})</h4><h2>{latest_value:,.2f}</h2></div>", unsafe_allow_html=True)
+    col1, col2 = st.columns(2)
+    col1.markdown(f"<div class='metric-card'><h4>Latest Value ({latest_year})</h4><h2>{latest_value:,.2f}</h2></div>", unsafe_allow_html=True)
+    col2.markdown(f"<div class='metric-card'><h4>Growth Since {first_year}</h4><h2>{growth:.2f}%</h2></div>", unsafe_allow_html=True)
     st.markdown(f"<div class='summary-box'>Between {first_year} and {latest_year}, <b>{selected_country}'s {selected_indicator}</b> changed by <b>{growth:.2f}%</b>.</div>", unsafe_allow_html=True)
     with st.expander("🔎 View Raw Data"):
         st.dataframe(filtered)
@@ -71,10 +93,10 @@ with overview_tab:
         st.download_button("📥 Download Filtered CSV", csv, file_name=f"{selected_country}_{selected_indicator}.csv")
 
 with ai_tab:
-    st.markdown("## 🧠 AI-generated Insight")
-    if st.button("Generate AI Insight Summary"):
+    st.markdown("## 🤖 AI-generated Insight")
+    if st.button("Generate Summary with GPT"):
         try:
-            prompt = f"Summarize the trend of {selected_indicator} for {selected_country} from {first_year} to {latest_year}. Data: {filtered.to_dict(orient='records')}"
+            prompt = f"Summarize the trend of {selected_indicator} for {selected_country} from {first_year} to {latest_year}. Data: {filtered.to_dict(orient='records')}. Keep it concise."
             response = openai.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[{"role": "user", "content": prompt}],
@@ -87,8 +109,8 @@ with ai_tab:
             st.error(f"Error generating summary: {e}")
 
 with compare_tab:
-    st.markdown("## 🌍 Country Comparison")
-    multi_countries = st.multiselect("Select countries to compare", countries)
+    st.markdown("## 🌐 Country Comparison")
+    multi_countries = st.multiselect("Compare countries", countries)
     if multi_countries:
         compare_df = df[df["Country"].isin(multi_countries)][["Country", "Year", selected_indicator]].dropna()
         pivot_df = compare_df.pivot(index="Year", columns="Country", values=selected_indicator)
