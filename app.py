@@ -7,7 +7,7 @@ import openai
 
 st.set_page_config(page_title="Economic Dashboard", layout="centered")
 
-# Custom styling for a clean card-style layout
+# Custom styling
 st.markdown("""
     <style>
         .main { background-color: #f7f7f7; }
@@ -37,7 +37,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Load and clean dataset
+# Load data
 try:
     df = pd.read_csv("data/clean_economic_data.csv")
     df = df[df["Country"].notnull()]
@@ -47,54 +47,54 @@ except Exception as e:
     st.error(f"Error loading data: {e}")
     st.stop()
 
-# Sidebar controls
+# Sidebar selections
 st.sidebar.title("🌍 Economic Dashboard")
-st.sidebar.write("Analyze economic indicators from World Bank data")
+st.sidebar.write("Analyze key economic indicators by country from 2000 onwards.")
 countries = sorted(df["Country"].dropna().unique())
 indicators = df.columns[2:]
 selected_indicator = st.sidebar.selectbox("Select an indicator", indicators)
 selected_country = st.sidebar.selectbox("Select a country", countries)
 
-# Filtered data
+# Filtered data for display
 filtered = df[df["Country"] == selected_country][["Year", selected_indicator]].dropna()
-
-# Main layout
 st.markdown(f"<div class='title-text'>{selected_country} – {selected_indicator} Over Time</div>", unsafe_allow_html=True)
 st.line_chart(filtered.set_index("Year"))
 
+# Latest metric
 latest_year = filtered["Year"].max()
 latest_value = filtered[filtered["Year"] == latest_year][selected_indicator].values[0]
 st.markdown(f"<div class='metric-box'><h3>Latest Value ({latest_year})</h3><h2>{latest_value:,.2f}</h2></div>", unsafe_allow_html=True)
 
+# Growth insight
 first_year = filtered["Year"].min()
 first_value = filtered[filtered["Year"] == first_year][selected_indicator].values[0]
 growth = ((latest_value - first_value) / first_value) * 100
 insight = f"Between {first_year} and {latest_year}, <b>{selected_country}</b>'s <b>{selected_indicator}</b> changed by <b>{growth:.2f}%</b>."
 st.markdown(f"<div class='insight-box'>{insight}</div>", unsafe_allow_html=True)
 
-# AI insight button
+# OpenAI insight generation
 if st.button("Generate AI Insight Summary"):
     try:
         openai.api_key = st.secrets["OPENAI_API_KEY"]
         prompt = f"Summarize the trend of {selected_indicator} for {selected_country} from {first_year} to {latest_year}. Data: {filtered.to_dict(orient='records')}"
-        response = openai.ChatCompletion.create(
+        response = openai.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.5,
             max_tokens=150
         )
-        summary = response['choices'][0]['message']['content']
+        summary = response.choices[0].message.content
         st.markdown(f"<div class='insight-box'>{summary}</div>", unsafe_allow_html=True)
     except Exception as e:
         st.error(f"Error generating summary: {e}")
 
-# Raw data display and download
+# Raw data display
 with st.expander("🔎 View Raw Data"):
     st.dataframe(filtered)
     csv = filtered.to_csv(index=False).encode("utf-8")
     st.download_button("📥 Download Filtered CSV", csv, file_name=f"{selected_country}_{selected_indicator}.csv")
 
-# Forecasting for GDP
+# Forecasting if GDP selected
 if selected_indicator == "GDP (current US$)":
     st.markdown("---")
     st.subheader(f"📈 GDP Forecast for {selected_country} (Next 4 Years)")
@@ -122,7 +122,7 @@ if selected_indicator == "GDP (current US$)":
     forecast_csv = forecast_df.to_csv(index=False).encode("utf-8")
     st.download_button("📥 Download Forecast CSV", forecast_csv, file_name=f"{selected_country}_GDP_forecast.csv")
 
-# Country comparison section
+# Country comparison chart
 st.markdown("---")
 st.subheader(f"🌐 Compare {selected_indicator} Across Countries")
 multi_countries = st.multiselect("Select countries to compare", countries)
