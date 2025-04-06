@@ -10,9 +10,8 @@ import plotly.graph_objects as go
 
 st.set_page_config(layout="wide")
 st.title("🌍 Global Economic Dashboard - Real-Time Data")
-from datetime import datetime
+st.caption(f"⏱️ Last updated (Local Time): {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} — Auto-refreshed every 24h")
 
-st.caption(f"⏱️ Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} (auto-refreshed every 24h)")
 
 
 # --- CONFIG --- #
