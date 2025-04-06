@@ -19,9 +19,18 @@ st.caption(f"⏱️ Last updated (Local Time): {now_local} — Auto-refreshed ev
 
 # --- CONFIG --- #
 INDICATORS = {
-    "FP.CPI.TOTL.ZG": "Inflation (CPI)",
+   "FP.CPI.TOTL.ZG": "Inflation (CPI)",
     "NY.GDP.MKTP.CD": "GDP (current US$)",
-    "SL.UEM.TOTL.ZS": "Unemployment Rate"
+    "SL.UEM.TOTL.ZS": "Unemployment Rate","FP.CPI.TOTL.ZG": "Inflation (CPI)",
+    "NY.GDP.MKTP.CD": "GDP (current US$)",
+    "SL.UEM.TOTL.ZS": "Unemployment Rate",
+    "SP.POP.TOTL": "Total Population",
+    "NY.GNP.PCAP.CD": "GNI per Capita (US$)",
+    "NE.EXP.GNFS.CD": "Exports of Goods & Services (US$)",
+    "NE.IMP.GNFS.CD": "Imports of Goods & Services (US$)",
+    "GC.TAX.TOTL.GD.ZS": "Tax Revenue (% of GDP)",
+    "SE.XPD.TOTL.GD.ZS": "Gov. Expenditure on Education (% of GDP)",
+    "SH.XPD.CHEX.GD.ZS": "Health Expenditure (% of GDP)"
 }
 
 COUNTRY_ISO_MAP = {
