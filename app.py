@@ -11,7 +11,7 @@ import plotly.graph_objects as go
 
 st.set_page_config(layout="wide")
 st.title("🌍 Global Economic Dashboard - Real-Time Data")
-local_tz = pytz.timezone("Asia/Kolkata")  # Change to your timezone
+local_tz = pytz.timezone("America/New_York")  # Change to your timezone
 now_local = datetime.now(local_tz).strftime('%Y-%m-%d %H:%M:%S')
 st.caption(f"⏱️ Last updated (Local Time): {now_local} — Auto-refreshed every 24h")
 
