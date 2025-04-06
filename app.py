@@ -1,27 +1,23 @@
+from datetime import datetime
+import pytz
 import streamlit as st
 import pandas as pd
 import wbdata
-import datetime
-import pytz
-from datetime import datetime
 import plotly.express as px
 from prophet import Prophet
-from plotly.subplots import make_subplots
-import plotly.graph_objects as go
 
+# Set timezone for local time display
+local_tz = pytz.timezone("Asia/Kolkata")  # Change as needed
+now_local = datetime.now(local_tz).strftime('%Y-%m-%d %H:%M:%S')
+
+# Show local refresh time
 st.set_page_config(layout="wide")
 st.title("🌍 Global Economic Dashboard - Real-Time Data")
-local_tz = pytz.timezone("America/New_York")  # Change to your timezone
-now_local = datetime.now(local_tz).strftime('%Y-%m-%d %H:%M:%S')
 st.caption(f"⏱️ Last updated (Local Time): {now_local} — Auto-refreshed every 24h")
 
-
-
-# --- CONFIG --- #
+# Indicator configuration
 INDICATORS = {
-   "FP.CPI.TOTL.ZG": "Inflation (CPI)",
-    "NY.GDP.MKTP.CD": "GDP (current US$)",
-    "SL.UEM.TOTL.ZS": "Unemployment Rate","FP.CPI.TOTL.ZG": "Inflation (CPI)",
+    "FP.CPI.TOTL.ZG": "Inflation (CPI)",
     "NY.GDP.MKTP.CD": "GDP (current US$)",
     "SL.UEM.TOTL.ZS": "Unemployment Rate",
     "SP.POP.TOTL": "Total Population",
@@ -33,6 +29,7 @@ INDICATORS = {
     "SH.XPD.CHEX.GD.ZS": "Health Expenditure (% of GDP)"
 }
 
+# Country codes and names
 COUNTRY_ISO_MAP = {
     "USA": "🇺🇸 United States", "CHN": "🇨🇳 China", "JPN": "🇯🇵 Japan", "DEU": "🇩🇪 Germany",
     "IND": "🇮🇳 India", "GBR": "🇬🇧 United Kingdom", "FRA": "🇫🇷 France", "BRA": "🇧🇷 Brazil",
@@ -48,27 +45,20 @@ COUNTRY_ISO_MAP = {
     "ROU": "🇷🇴 Romania", "PRT": "🇵🇹 Portugal", "PER": "🇵🇪 Peru", "NZL": "🇳🇿 New Zealand",
     "UKR": "🇺🇦 Ukraine", "HUN": "🇭🇺 Hungary"
 }
-
-# Reverse lookup for display name to ISO code
 COUNTRIES = {v: k for k, v in COUNTRY_ISO_MAP.items()}
 
-# --- Sidebar Filters --- #
+# Sidebar
 st.sidebar.header("🔍 Filter")
-
 selected_indicator_name = st.sidebar.selectbox("Select an Indicator", list(INDICATORS.values()))
 selected_indicator_code = [code for code, name in INDICATORS.items() if name == selected_indicator_name][0]
-
 selected_countries = st.sidebar.multiselect("Select Countries", list(COUNTRIES.keys()), default=["🇺🇸 United States", "🇮🇳 India"])
+year_range = st.sidebar.slider("Select Year Range", 2000, 2023, (2010, 2023))
 
-year_range = st.sidebar.slider("Select Year Range", 2000, 2023, (2000, 2023))
-
-# --- Fetch data --- #
-@st.cache_data(ttl=86400, show_spinner=True)  # Auto-refresh daily
+# Tabs
+@st.cache_data(ttl=86400, show_spinner=True)
 def fetch_data(selected_indicator_code):
     start_date = datetime(2000, 1, 1)
-
     end_date = datetime(2023, 1, 1)
-
     try:
         iso_codes = list(COUNTRY_ISO_MAP.keys())
         raw_df = wbdata.get_dataframe(
@@ -76,7 +66,6 @@ def fetch_data(selected_indicator_code):
             country=iso_codes,
             date=(start_date, end_date)
         ).reset_index()
-
         if 'country' in raw_df.columns and 'date' in raw_df.columns:
             raw_df.rename(columns={
                 'country': 'Country',
@@ -90,21 +79,15 @@ def fetch_data(selected_indicator_code):
             return raw_df[['Year', 'Country', 'Value']]
         else:
             return pd.DataFrame(columns=['Year', 'Country', 'Value'])
-
     except Exception as e:
         st.error(f"❌ Error fetching data: {e}")
         return pd.DataFrame(columns=['Year', 'Country', 'Value'])
 
-
-# --- Load data --- #
-with st.spinner("Fetching live economic data from World Bank..."):
+with st.spinner("Fetching live data..."):
     data = fetch_data(selected_indicator_code)
+    data = data[(data['Year'] >= year_range[0]) & (data['Year'] <= year_range[1])]
+    data = data[data['Country'].isin(selected_countries)]
 
-# --- Filter data --- #
-data = data[(data['Year'] >= year_range[0]) & (data['Year'] <= year_range[1])]
-data = data[data['Country'].isin(selected_countries)]
-
-# --- Tabs --- #
 tabs = st.tabs(["Overview", "Comparison", "Map", "Forecast", "Download"])
 
 # --- Overview Tab --- #
@@ -116,7 +99,8 @@ with tabs[0]:
             st.metric(label=f"Latest {selected_indicator_name} - {country}",
                       value=f"{country_data['Value'].iloc[-1]:,.2f}",
                       delta=f"{(country_data['Value'].iloc[-1] - country_data['Value'].iloc[-2]):+.2f}" if len(country_data) > 1 else "")
-            st.line_chart(country_data.set_index("Year")["Value"])
+            with st.expander(f"📈 {country} Trend Chart", expanded=False):
+                st.line_chart(country_data.set_index("Year")["Value"])
         else:
             st.info(f"No data available for {country}.")
 
@@ -149,13 +133,54 @@ with tabs[2]:
     except Exception as e:
         st.error(f"Map failed to render: {e}")
 
+# --- Download Tab --- #
+with tabs[4]:
+    st.subheader("📥 Download Filtered Data")
+    if not data.empty:
+        st.download_button("Download CSV", data.to_csv(index=False),
+                           file_name=f"{selected_indicator_name}_filtered_data.csv",
+                           mime="text/csv")
+    else:
+        st.info("No data available to download.")
+
 # --- Forecast Tab --- #
-# --- Forecast Tab --- #
+@st.cache_data(ttl=86400, show_spinner=True)
+def fetch_data(selected_indicator_code):
+    start_date = datetime(2000, 1, 1)
+    end_date = datetime(2023, 1, 1)
+    try:
+        iso_codes = list(COUNTRY_ISO_MAP.keys())
+        raw_df = wbdata.get_dataframe(
+            {selected_indicator_code: selected_indicator_name},
+            country=iso_codes,
+            date=(start_date, end_date)
+        ).reset_index()
+        if 'country' in raw_df.columns and 'date' in raw_df.columns:
+            raw_df.rename(columns={
+                'country': 'Country',
+                'date': 'Year',
+                selected_indicator_name: 'Value'
+            }, inplace=True)
+            raw_df['Year'] = pd.to_datetime(raw_df['Year']).dt.year
+            raw_df['Country'] = raw_df['Country'].map(
+                lambda name: next((v for k, v in COUNTRY_ISO_MAP.items() if name.lower() in v.lower()), name)
+            )
+            return raw_df[['Year', 'Country', 'Value']]
+        else:
+            return pd.DataFrame(columns=['Year', 'Country', 'Value'])
+    except Exception as e:
+        st.error(f"❌ Error fetching data: {e}")
+        return pd.DataFrame(columns=['Year', 'Country', 'Value'])
+
+with st.spinner("Fetching live data..."):
+    data = fetch_data(selected_indicator_code)
+    data = data[(data['Year'] >= year_range[0]) & (data['Year'] <= year_range[1])]
+    data = data[data['Country'].isin(selected_countries)]
+
 with tabs[3]:
     st.subheader(f"🔮 Forecasting - {selected_indicator_name}")
     forecast_horizon = st.slider("📅 Forecast years", 1, 15, 5)
     valid_forecasts = []
-
     for country in selected_countries:
         country_data = data[data['Country'] == country].dropna().sort_values("Year")
         if len(country_data) >= 5:
@@ -165,14 +190,10 @@ with tabs[3]:
             model.fit(df_prophet)
             future = model.make_future_dataframe(periods=forecast_horizon, freq='Y')
             forecast = model.predict(future)
-
-            # ✅ Correct mapping of actual values
             actual_map = df_prophet.set_index("ds")["y"].to_dict()
             forecast["Actual"] = forecast["ds"].map(actual_map)
-
             forecast["Country"] = country
             valid_forecasts.append(forecast[["ds", "yhat", "Country", "Actual"]].copy())
-
     if valid_forecasts:
         forecast_df = pd.concat(valid_forecasts)
         fig = px.line(forecast_df, x="ds", y="yhat", color="Country", title="Multi-Country Forecast")
@@ -180,8 +201,6 @@ with tabs[3]:
             actual = forecast_df[(forecast_df["Country"] == country) & forecast_df["Actual"].notna()]
             fig.add_scatter(x=actual["ds"], y=actual["Actual"], mode="markers", name=f"Actual - {country}")
         st.plotly_chart(fig, use_container_width=True)
-
-        # --- AI-Generated Insights --- #
         st.subheader("🧠 AI Insights")
         insights_data = []
         for country in selected_countries:
@@ -202,13 +221,11 @@ with tabs[3]:
                 })
                 st.markdown(f"**{country}**: The forecast suggests a **{trend}** of approximately **{abs(change_pct):.2f}%** from {first_year} to {last_year}.")
                 if trend == "increase 📈":
-                    st.markdown("➡️ This upward trend may indicate economic growth or inflationary pressure, depending on the indicator. Policymakers and investors should monitor this trajectory closely.")
+                    st.markdown("➡️ This upward trend may indicate economic growth or inflationary pressure.")
                 elif trend == "decrease 📉":
-                    st.markdown("⬇️ A downward trend could reflect positive effects like reduced inflation or negative ones like economic contraction. Further investigation is recommended.")
+                    st.markdown("⬇️ A downward trend could reflect reduced inflation or contraction.")
                 else:
-                    st.markdown("➖ Stability in this metric suggests a consistent economic pattern, which can be good for long-term planning and risk management.")
-
-        # Display insights table
+                    st.markdown("➖ Stability in this metric suggests a consistent economic pattern.")
         if insights_data:
             st.markdown("### 📋 Summary Table")
             styled_df = pd.DataFrame(insights_data).style.format(
@@ -230,14 +247,3 @@ with tabs[3]:
             )
     else:
         st.info("Not enough data to forecast for the selected countries.")
-
-
-# --- Download Tab --- #
-with tabs[4]:
-    st.subheader("Download Filtered Data")
-    if not data.empty:
-        st.download_button("📥 Download CSV", data.to_csv(index=False),
-                           file_name=f"{selected_indicator_name}_filtered_data.csv",
-                           mime="text/csv")
-    else:
-        st.info("No data to download.")
