@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import wbdata
 import datetime
+from datetime import datetime
 import plotly.express as px
 from prophet import Prophet
 from plotly.subplots import make_subplots
@@ -9,6 +10,10 @@ import plotly.graph_objects as go
 
 st.set_page_config(layout="wide")
 st.title("🌍 Global Economic Dashboard - Real-Time Data")
+from datetime import datetime
+
+st.caption(f"⏱️ Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} (auto-refreshed every 24h)")
+
 
 # --- CONFIG --- #
 INDICATORS = {
@@ -49,8 +54,9 @@ year_range = st.sidebar.slider("Select Year Range", 2000, 2023, (2000, 2023))
 # --- Fetch data --- #
 @st.cache_data(ttl=86400, show_spinner=True)  # Auto-refresh daily
 def fetch_data(selected_indicator_code):
-    start_date = datetime.datetime(2000, 1, 1)
-    end_date = datetime.datetime(2023, 1, 1)
+    start_date = datetime(2000, 1, 1)
+
+    end_date = datetime(2023, 1, 1)
 
     try:
         iso_codes = list(COUNTRY_ISO_MAP.keys())
