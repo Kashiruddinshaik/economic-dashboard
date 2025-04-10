@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import wbdata
-import datetime
+import pytz
 from datetime import datetime
 import plotly.express as px
 from prophet import Prophet
@@ -12,7 +12,9 @@ st.set_page_config(layout="wide")
 st.title("🌍 Global Economic Dashboard - Real-Time Data")
 
 
-st.caption(f"⏱️ Last updated (Local Time): {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} — Auto-refreshed every 24h")
+local_tz = pytz.timezone("Asia/Kolkata")  # Change this to your timezone if needed
+now_local = datetime.now(local_tz).strftime('%Y-%m-%d %H:%M:%S')
+st.caption(f"⏱️ Last updated (Local Time): {now_local} — Auto-refreshed every 24h")
 
 
 # --- CONFIG --- #
