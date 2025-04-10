@@ -12,7 +12,7 @@ st.set_page_config(layout="wide")
 st.title("🌍 Global Economic Dashboard - Real-Time Data")
 
 
-local_tz = pytz.timezone("Asia/Kolkata")  # Change this to your timezone if needed
+local_tz = pytz.timezone("newyork/america")  # Change this to your timezone if needed
 now_local = datetime.now(local_tz).strftime('%Y-%m-%d %H:%M:%S')
 st.caption(f"⏱️ Last updated (Local Time): {now_local} — Auto-refreshed every 24h")
 
